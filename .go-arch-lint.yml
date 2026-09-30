@@ -1,0 +1,47 @@
+# Architecture spec for platform. It REPLACES the organisation spec that the Go
+# quality gate ships (auarstadtt/github-workflows, go-quality action).
+#
+# Reason for the override: this repo is a flat LIBRARY, not a service. It has no
+# domain/, repository/, service/ or handler/ directory, and go-arch-lint
+# hard-errors on a declared component that matches no directory, so the
+# organisation spec cannot be applied here at all.
+#
+# This is an honest exemption rather than a fabricated one. The alternative would
+# be inventing empty domain/ and repository/ directories to satisfy the gate,
+# which would make the spec lie about the repo's shape. A layer graph is not a
+# meaningful constraint on a single-package middleware library: there are no
+# layers to invert.
+#
+# What DOES constrain this repo is its dependency surface, and that is guarded by
+# review rather than by this file: platform is imported by every Go service, so
+# anything added to its go.mod is added to all of them. Keep it to zap,
+# golang.org/x/time, grpc and getsentry/sentry-go. In particular do NOT pull in a
+# router, an ORM, or a cloud SDK.
+#
+# sentry-go was added deliberately upstream (RFLKT-5730), which moved the
+# error-reporting wrapper here so services stop re-deriving its two silent
+# failure modes. The router exclusion survived that change: UseSentry takes the
+# local `Router` interface (one method, satisfied structurally by chi.Router) and
+# Recoverer is implemented here, so mounting middleware costs no chi import.
+#
+# Upstream also carries oauth/ and mcp/ subpackages with a real dependency graph
+# between them. The fork removed both (see README), so one component is left. If
+# a subpackage comes back, give it its own component here and state which way it
+# may depend: a subpackage may import platform, never the reverse.
+
+version: 3
+workdir: .
+
+allow:
+  depOnAnyVendor: true
+  deepScan: false
+
+excludeFiles:
+  - "^.*_test\\.go$"
+
+components:
+  platform: { in: "." }
+
+deps:
+  platform:
+    anyVendorDeps: true
