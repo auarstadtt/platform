@@ -1,0 +1,163 @@
+# Copy of .github/actions/go-quality/golangci.yml in auarstadtt/github-workflows
+# (bd08cab). This repository is public, and a public repository cannot use
+# that private repository's actions, so the gate here runs its own copy.
+# Keep the two identical: change the shared file first, then copy it here.
+#
+# Shared golangci-lint configuration for every Go repository in the organisation.
+# Applied by the go-quality action; see https://golangci-lint.run/usage/configuration/
+#
+# Ported as-is from an existing, working configuration, including its list
+# indentation, which golangci-lint parses fine; hence the indentation rule off.
+# yamllint disable rule:indentation
+
+version: "2"
+run:
+  # Cold runs on GitHub-hosted runners can be slow on larger modules; the
+  # timeout is headroom above that, not a way to hide a hung run.
+  timeout: 20m
+  tests: true
+
+linters:
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+    goconst:
+      min-len: 3
+      # 5, not 2: at 2 it flags any short string used twice, API field names
+      # included, and a gate full of false positives teaches people to ignore it.
+      min-occurrences: 5
+      ignore-string-values:
+        - "^(error|status|code|category|message|establishmentId|price|unique)$"
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - experimental
+        - opinionated
+        - performance
+        - style
+      disabled-checks:
+        - dupImport
+        - ifElseChain
+        - octalLiteral
+        - whyNoLint
+        - wrapperFunc
+        - rangeValCopy
+      settings:
+        hugeParam:
+          sizeThreshold: 512
+    gocyclo:
+      min-complexity: 31
+    govet:
+      enable:
+        - shadow
+    misspell:
+      locale: US
+      ignore-rules:
+        - catalogue
+        - catalog
+    nolintlint:
+      allow-unused: true
+      require-explanation: false
+      require-specific: false
+    revive:
+      severity: warning
+      rules:
+        - name: exported
+        - name: var-naming
+        - name: error-return
+        - name: error-naming
+        - name: increment-decrement
+        - name: var-declaration
+        - name: range
+        - name: receiver-naming
+        - name: unexported-return
+        - name: time-naming
+        - name: context-keys-type
+        - name: if-return
+        - name: string-of-int
+        - name: early-return
+        - name: unused-parameter
+        - name: confusing-results
+        - name: deep-exit
+        - name: flag-parameter
+        - name: empty-block
+        - name: superfluous-else
+        - name: use-any
+        - name: max-public-structs
+          arguments: [0]
+        - name: file-header
+          disabled: true
+  enable:
+    - errcheck
+    - goconst
+    - gocritic
+    - gocyclo
+    - revive
+    - gosec
+    - govet
+    - ineffassign
+    - misspell
+    - nakedret
+    - noctx
+    - nolintlint
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+    - whitespace
+  exclusions:
+    paths:
+    - '.*_pb\.go$'
+    - '.*\.pb\.go$'
+    # Generated code (protobuf, templ views) is never hand-edited, so never linted.
+    - '.*_templ\.go$'
+    - '.*_test\.go$'
+    - '.*_grpc_test\.go$'
+    - vendor
+    - bin
+    - build
+    - tmp
+    - test/mocks
+    rules:
+      - path: '(.+)_test\.go$'
+        linters:
+        - revive
+        - errcheck
+        - goconst
+        - gocritic
+        - gocyclo
+      - path: '^test/.*\.go$'
+        linters:
+        - revive
+        - errcheck
+        - goconst
+        - gocritic
+        - gocyclo
+      - path: '^test/mocks/.*\.go$'
+        linters:
+        - revive
+        - errcheck
+        - goconst
+        - gocritic
+        - gocyclo
+
+
+issues:
+  max-issues-per-linter: 1000
+  max-same-issues: 1000
+
+# Formatting gate. Whole-tree, like every other linter here: a repository with
+# existing drift fails until someone runs gofmt/goimports once. That is one
+# mechanical command with no judgement in it, and gating only changed files
+# would let the rest of the tree keep drifting.
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - '.*_templ\.go$'
+      - '.*\.pb\.go$'
+      - '.*_grpc\.pb\.go$'
