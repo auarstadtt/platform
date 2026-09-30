@@ -1,0 +1,54 @@
+# The Go quality gate, run from this repository.
+#
+# Everywhere else the organisation's "Go quality" ruleset runs go-quality.yml
+# from auarstadtt/github-workflows. It cannot here: that repository is private,
+# and GitHub does not let a public repository use a private repository's
+# workflows or actions. So the same steps, at the same pinned versions, live in
+# this file, with the shared golangci config copied beside them. A repository
+# ruleset makes this job a required check on main.
+#
+# Keep it in step with the go-quality action when that changes.
+
+name: Go quality
+
+on:
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Go quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # The module's own go directive decides the Go version, so CI builds
+      # with what the module declares.
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      # Pinned: the vulnerability data is fetched from vuln.go.dev on every
+      # scan, so pinning the scanner costs no coverage.
+      - name: Vulnerability scan
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+          govulncheck ./...
+
+      - name: Lint and formatting
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12.2
+          args: --config=.golangci.yml
+
+      - name: Architecture lint
+        run: |
+          go install github.com/fe3dback/go-arch-lint@v1.16.0
+          "$(go env GOPATH)/bin/go-arch-lint" check --arch-file .go-arch-lint.yml --project-path "$PWD"
+
+      - name: Tests
+        run: go test -race -count=1 ./...
