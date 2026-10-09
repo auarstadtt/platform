@@ -26,11 +26,29 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # The module's own go directive decides the Go version, so CI builds
-      # with what the module declares.
+      # The module's own go directive (and toolchain line, if higher) decides
+      # the Go minor, and CI takes the newest patch of it, as the go-quality
+      # action does. go-version-file alone pins the exact directive: since a
+      # dependency moved it to "go 1.26.0", that installed 1.26.0 itself, and
+      # govulncheck failed on standard-library fixes already released.
+      - name: Resolve the Go version
+        id: go-version
+        run: |
+          set -euo pipefail
+          go_line=$(sed -n 's/^go \([0-9][0-9.]*\).*/\1/p' go.mod | head -1)
+          tc_line=$(sed -n 's/^toolchain go\([0-9][0-9.]*\).*/\1/p' go.mod | head -1)
+          [ -n "$go_line" ] || { echo "::error::No go directive in go.mod"; exit 1; }
+          minor() { printf '%s' "$1" | cut -d. -f1-2; }
+          want=$(minor "$go_line")
+          if [ -n "$tc_line" ]; then
+            want=$(printf '%s\n%s\n' "$want" "$(minor "$tc_line")" | sort -V | tail -1)
+          fi
+          echo "spec=${want}.x" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: ${{ steps.go-version.outputs.spec }}
+          check-latest: true
 
       # Pinned: the vulnerability data is fetched from vuln.go.dev on every
       # scan, so pinning the scanner costs no coverage.
