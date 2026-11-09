@@ -63,6 +63,23 @@ func (s *statusRecorder) Write(b []byte) (int, error) {
 	return s.ResponseWriter.Write(b)
 }
 
+// Flush passes a flush through, so a streamed response (server-sent events,
+// an MCP subscriptions/listen stream) reaches the client as it is written
+// instead of when the handler returns. Without it the wrapper hides the
+// underlying http.Flusher and every stream behind RequestLogger stalls.
+func (s *statusRecorder) Flush() {
+	if !s.wrote {
+		s.status, s.wrote = http.StatusOK, true
+	}
+	if f, ok := s.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// Unwrap lets http.ResponseController reach the underlying writer, for
+// deadlines, hijacking and full-duplex.
+func (s *statusRecorder) Unwrap() http.ResponseWriter { return s.ResponseWriter }
+
 // LoggingOptions configures RequestLogger.
 type LoggingOptions struct {
 	// Logger is the base logger. Required.
